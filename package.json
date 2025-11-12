@@ -1,0 +1,27 @@
+{
+  "name": "zhilian",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/yycceth/zhilian#readme",
+  "bugs": {
+    "url": "https://github.com/yycceth/zhilian/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yycceth/zhilian.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@openzeppelin/contracts-upgradeable": "^5.5.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "dotenv": "^17.2.3",
+    "hardhat": "^2.27.0"
+  }
+}

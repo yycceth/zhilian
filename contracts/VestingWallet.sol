@@ -166,6 +166,30 @@ contract VestingWallet is
         whenNotPaused
         returns (uint256 scheduleId)
     {
+        return _addSchedule(_beneficiary, _tokenAmount);
+    }
+
+    // 管理员批量添加归属计划
+    function battchAddSchedule(
+        address[] calldata _beneficiaries,
+        uint96[] calldata _tokenAmounts
+    ) external onlyRole(VEST_MANAGER_ROLE) whenNotPaused {
+        require(
+            _beneficiaries.length == _tokenAmounts.length,
+            "Mismatched array length"
+        );
+        for (uint256 i = 0; i < _tokenAmounts.length; ) {
+            _addSchedule(_beneficiaries[i], _tokenAmounts[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function _addSchedule(
+        address _beneficiary,
+        uint96 _tokenAmount
+    ) internal returns (uint256 scheduleId) {
         require(_beneficiary != address(0), "Beneficiary address is zero");
         require(_tokenAmount != 0, "Token amount is zero");
         require(
@@ -197,9 +221,6 @@ contract VestingWallet is
 
         emit AddSchedule(scheduleId, _beneficiary, _tokenAmount);
     }
-
-    // todo
-    // 管理员批量添加归属计划
 
     // 用户领取tge的代币数量
     function claimTgeAmount(

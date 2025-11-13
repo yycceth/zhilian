@@ -246,21 +246,7 @@ contract VestingWallet is
     function claim(
         uint256 _scheduleId
     ) public whenNotPaused returns (uint96 claimableAmount) {
-        require(_schedules[_scheduleId].tokenAmount > 0, "Invalid schedule id");
-        require(
-            _schedules[_scheduleId].beneficiary == msg.sender,
-            "Sender should be beneficiary"
-        );
-
-        // 获取可领取的代币数量
-        claimableAmount = getClaimableAmountByScheduleId(_scheduleId);
-        require(claimableAmount > 0, "Claimable amount is zero");
-
-        _schedules[_scheduleId].releasedAmount += claimableAmount;
-
-        tokenAddress.safeTransfer(msg.sender, claimableAmount);
-
-        emit Claim(_scheduleId, msg.sender, claimableAmount);
+        return _claim(_scheduleId, msg.sender);
     }
 
     // 用户批量领取代币数量
@@ -297,8 +283,38 @@ contract VestingWallet is
         tokenAddress.safeTransfer(msg.sender, claimableAmount);
     }
 
-    // todo
     // 管理员批量领取代币数量
+    function adminBatchClaim(
+        uint256[] calldata _scheduleIds
+    ) external onlyRole(VEST_MANAGER_ROLE) whenNotPaused {
+        for (uint256 i = 0; i < _scheduleIds.length; ) {
+            _claim(_scheduleIds[i], _schedules[_scheduleIds[i]].beneficiary);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function _claim(
+        uint256 _scheduleId,
+        address _beneficiary
+    ) internal returns (uint96 claimableAmount) {
+        require(_schedules[_scheduleId].tokenAmount > 0, "Invalid schedule id");
+        require(
+            _schedules[_scheduleId].beneficiary == _beneficiary,
+            "Sender should be beneficiary"
+        );
+
+        // 获取可领取的代币数量
+        claimableAmount = getClaimableAmountByScheduleId(_scheduleId);
+        require(claimableAmount > 0, "Claimable amount is zero");
+
+        _schedules[_scheduleId].releasedAmount += claimableAmount;
+
+        tokenAddress.safeTransfer(_beneficiary, claimableAmount);
+
+        emit Claim(_scheduleId, _beneficiary, claimableAmount);
+    }
 
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();

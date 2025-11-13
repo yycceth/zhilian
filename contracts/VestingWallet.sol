@@ -258,6 +258,21 @@ contract VestingWallet is
         tokenAddress.safeTransfer(msg.sender, tgeAllAmount);
     }
 
+    // 管理员批量领取tge的代币数量
+    function adminBatchClaimTgeAmount(
+        uint256[] calldata _scheduleIds
+    ) external onlyRole(VEST_MANAGER_ROLE) whenNotPaused {
+        for (uint256 i = 0; i < _scheduleIds.length; ) {
+            _claimTgeAmount(
+                _scheduleIds[i],
+                _schedules[_scheduleIds[i]].beneficiary
+            );
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     function _claimTgeAmount(
         uint256 _scheduleId,
         address _beneficiary

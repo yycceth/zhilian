@@ -440,7 +440,7 @@ contract VestingWallet is
             );
     }
 
-    function end() public view virtual returns (uint256) {
+    function endTime() public view returns (uint256) {
         return
             _vestingInfo.startTimestamp +
             _vestingInfo.cliffTime +

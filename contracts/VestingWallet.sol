@@ -241,10 +241,11 @@ contract VestingWallet is
         tokenAddress.safeTransfer(msg.sender, tgeAmount);
         emit ClaimTgeAmount(_scheduleId, msg.sender, tgeAmount);
     }
+
     // 用户领取释放的代币数量
     function claim(
         uint256 _scheduleId
-    ) external whenNotPaused returns (uint96 claimableAmount) {
+    ) public whenNotPaused returns (uint96 claimableAmount) {
         require(_schedules[_scheduleId].tokenAmount > 0, "Invalid schedule id");
         require(
             _schedules[_scheduleId].beneficiary == msg.sender,
@@ -262,8 +263,41 @@ contract VestingWallet is
         emit Claim(_scheduleId, msg.sender, claimableAmount);
     }
 
-    // todo
     // 用户批量领取代币数量
+    function batchClaim(
+        uint256[] calldata _scheduleIds
+    ) external whenNotPaused returns (uint96 claimableAmount) {
+        for (uint256 i = 0; i < _scheduleIds.length; ) {
+            require(
+                _schedules[_scheduleIds[i]].tokenAmount > 0,
+                "Invalid schedule id"
+            );
+            require(
+                _schedules[_scheduleIds[i]].beneficiary == msg.sender,
+                "Sender should be beneficiary"
+            );
+
+            uint96 currentIdclaimableAmount = getClaimableAmountByScheduleId(
+                _scheduleIds[i]
+            );
+            require(currentIdclaimableAmount > 0, "Claimable amount is zero");
+
+            _schedules[_scheduleIds[i]]
+                .releasedAmount += currentIdclaimableAmount;
+
+            claimableAmount += currentIdclaimableAmount;
+
+            emit Claim(_scheduleIds[i], msg.sender, currentIdclaimableAmount);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        tokenAddress.safeTransfer(msg.sender, claimableAmount);
+    }
+
+    // todo
     // 管理员批量领取代币数量
 
     function pause() public onlyRole(PAUSER_ROLE) {

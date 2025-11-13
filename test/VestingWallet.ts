@@ -48,7 +48,6 @@ describe("VestingWallet", function () {
     const currentTime = latestBlock?.timestamp!;
     startTimestamp += currentTime;
     tgeTimestamp += currentTime;
-    console.log("tgeTimestamp", tgeTimestamp)
     await VestingWalletProxy.updateVestingInfo(cliffTime, startTimestamp, durationTime, tgeTimestamp, tgePercentage)
 
     return { owner, user1, user2, user3, TestToken, VestingWalletProxy };

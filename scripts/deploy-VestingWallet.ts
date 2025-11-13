@@ -7,14 +7,13 @@ async function main() {
     const defaultAdmin = getSigners[0].address;
     const pauser = getSigners[0].address;
     const upgrader = getSigners[0].address;
-    const operator = getSigners[0].address;
 
-    const getContractFactory = await ethers.getContractFactory("Sale");
+    const getContractFactory = await ethers.getContractFactory("VestingWallet");
 
-    const deployProxy = await upgrades.deployProxy(getContractFactory, [defaultAdmin, pauser, upgrader, operator], {
+    const deployProxy = await upgrades.deployProxy(getContractFactory, [defaultAdmin, pauser, upgrader], {
         kind: "uups",
     });
-    console.log("Sale address: ", deployProxy.target);
+    console.log("VestingWallet address: ", deployProxy.target);
 }
 
 main().catch((error) => {

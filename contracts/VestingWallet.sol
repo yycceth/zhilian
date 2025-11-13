@@ -166,6 +166,13 @@ contract VestingWallet is
         whenNotPaused
         returns (uint256 scheduleId)
     {
+        require(_beneficiary != address(0), "Beneficiary address is zero");
+        require(_tokenAmount != 0, "Token amount is zero");
+        require(
+            block.timestamp < _vestingInfo.tgeTimestamp,
+            "Current time is greater than tge time"
+        );
+
         // 先自增
         ++currentScheduleId;
 

@@ -226,10 +226,46 @@ contract VestingWallet is
     function claimTgeAmount(
         uint256 _scheduleId
     ) external whenNotPaused returns (uint96 tgeAmount) {
+        return _claimTgeAmount(_scheduleId, msg.sender);
+    }
+
+    // 用户批量领取tge的代币数量
+    function batchClaimTgeAmount(
+        uint256[] calldata _scheduleIds
+    ) external whenNotPaused returns (uint96 tgeAllAmount) {
+        for (uint256 i = 0; i < _scheduleIds.length; ) {
+            uint96 tgeAmount = _schedules[_scheduleIds[i]].tgeReleaseAmount;
+            require(tgeAmount > 0, "Invalid schedule id");
+            require(
+                _schedules[_scheduleIds[i]].beneficiary == msg.sender,
+                "Sender should be beneficiary"
+            );
+            require(
+                block.timestamp >= _vestingInfo.tgeTimestamp,
+                "Invalid tge timestamp"
+            );
+            require(!_schedules[_scheduleIds[i]].tgeClaimed, "Already claimed");
+            _schedules[_scheduleIds[i]].tgeClaimed = true;
+
+            tgeAllAmount += tgeAmount;
+            emit ClaimTgeAmount(_scheduleIds[i], msg.sender, tgeAmount);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        tokenAddress.safeTransfer(msg.sender, tgeAllAmount);
+    }
+
+    function _claimTgeAmount(
+        uint256 _scheduleId,
+        address _beneficiary
+    ) internal returns (uint96 tgeAmount) {
         tgeAmount = _schedules[_scheduleId].tgeReleaseAmount;
         require(tgeAmount > 0, "Invalid schedule id");
         require(
-            _schedules[_scheduleId].beneficiary == msg.sender,
+            _schedules[_scheduleId].beneficiary == _beneficiary,
             "Sender should be beneficiary"
         );
         require(
@@ -238,8 +274,8 @@ contract VestingWallet is
         );
         require(!_schedules[_scheduleId].tgeClaimed, "Already claimed");
         _schedules[_scheduleId].tgeClaimed = true;
-        tokenAddress.safeTransfer(msg.sender, tgeAmount);
-        emit ClaimTgeAmount(_scheduleId, msg.sender, tgeAmount);
+        tokenAddress.safeTransfer(_beneficiary, tgeAmount);
+        emit ClaimTgeAmount(_scheduleId, _beneficiary, tgeAmount);
     }
 
     // 用户领取释放的代币数量

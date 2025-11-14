@@ -86,7 +86,7 @@ contract VestingWallet is
         // derived：依当前时间推导出的动态信息
         // 当前可以释放的总代币数量
         uint256 vested;
-        // 当前可以释放的代币数量
+        // 当前可以释放的可领取的代币数量
         uint256 claimable;
         // 是否超过了悬崖期
         bool cliffPassed;
@@ -459,7 +459,7 @@ contract VestingWallet is
         if (timestamp < _vestingInfo.startTimestamp + _vestingInfo.cliffTime) {
             return 0;
             // 已到结束时间
-        } else if (timestamp > end()) {
+        } else if (timestamp > endTime()) {
             return totalAllocation;
         } else {
             // 中间时间段

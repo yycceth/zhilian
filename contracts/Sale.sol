@@ -15,6 +15,18 @@ import {
     UUPSUpgradeable
 } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
+interface IVestingWallet {
+    function addSchedule(
+        address _beneficiary,
+        uint96 _tokenAmount
+    ) external returns (uint256 scheduleId);
+
+    function battchAddSchedule(
+        address[] calldata _beneficiaries,
+        uint96[] calldata _tokenAmounts
+    ) external;
+}
+
 contract Sale is
     Initializable,
     PausableUpgradeable,
@@ -24,6 +36,8 @@ contract Sale is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    IVestingWallet public vestingWallet;
 
     // 记录承销商从项目方购买的信息
     struct ConsigneeInfo {
@@ -38,14 +52,13 @@ contract Sale is
     struct PurchaseInfo {
         address consigneeAddress; // 承销商地址
         uint256 tokenAmount; // 已经购买总数量
+        uint256 createTime; // 添加时间
     }
     // 记录用户从承销商购买的信息，一对多
     mapping(address userAddress => PurchaseInfo[]) private _purchaseInfos;
     // 记录承销商对应的用户列表
     mapping(address consigneeAddress => address[] allUsers)
         private _purchasersByConsignee;
-
-    uint256[50] private __gap;
 
     // 事件，记录添加承销商的购买信息
     event AddConsignee(
@@ -81,10 +94,13 @@ contract Sale is
         address defaultAdmin,
         address pauser,
         address upgrader,
-        address operator
+        address operator,
+        address _vestingWalletAddress
     ) public initializer {
         __Pausable_init();
         __AccessControl_init();
+
+        vestingWallet = IVestingWallet(_vestingWalletAddress);
 
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(PAUSER_ROLE, pauser);
@@ -92,163 +108,161 @@ contract Sale is
         _grantRole(OPERATOR_ROLE, operator);
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
-        _pause();
-    }
-
-    function unpause() public onlyRole(PAUSER_ROLE) {
-        _unpause();
-    }
-
     /**.
      * @dev 添加承销商购买信息，仅项目方可调用。
-     * @param consigneeAddress 承销商地址。
-     * @param tokenAmount 购买数量。
+     * @param _consigneeAddress 承销商地址。
+     * @param _tokenAmount 购买数量。
      */
     function addConsignee(
-        address consigneeAddress,
-        uint256 tokenAmount
+        address _consigneeAddress,
+        uint256 _tokenAmount
     ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
-        require(consigneeAddress != address(0), "Invalid consignee address");
-        require(tokenAmount > 0, "Invalid token amount");
+        _addConsignee(_consigneeAddress, _tokenAmount);
+    }
 
-        ConsigneeInfo storage info = _consigneeInfos[consigneeAddress];
-        info.totalTokenAmount += tokenAmount;
+    function _addConsignee(
+        address _consigneeAddress,
+        uint256 _tokenAmount
+    ) internal {
+        require(_consigneeAddress != address(0), "Invalid consignee address");
+        require(_tokenAmount > 0, "Invalid token amount");
 
-        _allConsignees.push(consigneeAddress);
+        ConsigneeInfo storage info = _consigneeInfos[_consigneeAddress];
+        info.totalTokenAmount += _tokenAmount;
 
-        emit AddConsignee(msg.sender, consigneeAddress, tokenAmount);
+        _allConsignees.push(_consigneeAddress);
+
+        emit AddConsignee(msg.sender, _consigneeAddress, _tokenAmount);
     }
 
     /**
      * @dev 批量添加承销商购买信息，仅项目方可调用。
-     * @param consigneeAddresses 承销商地址数组。
-     * @param tokenAmounts 购买数量数组。
+     * @param _consigneeAddresses 承销商地址数组。
+     * @param _tokenAmounts 购买数量数组。
      */
     function batchAddConsignee(
-        address[] calldata consigneeAddresses,
-        uint256[] calldata tokenAmounts
+        address[] calldata _consigneeAddresses,
+        uint256[] calldata _tokenAmounts
     ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
         require(
-            consigneeAddresses.length == tokenAmounts.length,
+            _consigneeAddresses.length == _tokenAmounts.length,
             "Mismatched array lengths"
         );
 
-        for (uint256 i = 0; i < consigneeAddresses.length; i++) {
-            address consigneeAddress = consigneeAddresses[i];
-            uint256 tokenAmount = tokenAmounts[i];
-
-            require(
-                consigneeAddress != address(0),
-                "Invalid consignee address"
-            );
-            require(tokenAmount > 0, "Invalid token amount");
-
-            ConsigneeInfo storage info = _consigneeInfos[consigneeAddress];
-            info.totalTokenAmount += tokenAmount;
-
-            _allConsignees.push(consigneeAddress);
-
-            emit AddConsignee(msg.sender, consigneeAddress, tokenAmount);
+        for (uint256 i = 0; i < _tokenAmounts.length; ) {
+            _addConsignee(_consigneeAddresses[i], _tokenAmounts[i]);
+            unchecked {
+                ++i;
+            }
         }
     }
 
     /**
      * @dev 添加用户购买信息，仅注册的承销商可调用。
-     * @param userAddress 用户地址。
-     * @param tokenAmount 购买数量。
+     * @param _userAddress 用户地址。
+     * @param _tokenAmount 购买数量。
      */
-    function addPurchaseInfo(
-        address userAddress,
-        uint256 tokenAmount
+    function consigneeCreateOfflinePurchase(
+        address _userAddress,
+        uint96 _tokenAmount
     ) external onlyConsignee(msg.sender) whenNotPaused {
-        _addPurchaseInfo(msg.sender, userAddress, tokenAmount);
+        _createOfflinePurchase(msg.sender, _userAddress, _tokenAmount);
     }
 
     /**
      * @dev 添加用户购买信息，仅项目方可调用。
-     * @param consigneeAddress 承销商地址。
-     * @param userAddress 用户地址。
-     * @param tokenAmount 购买数量。
+     * @param _consigneeAddress 承销商地址。
+     * @param _userAddress 用户地址。
+     * @param _tokenAmount 购买数量。
      */
-    function ownerAddPurchaseInfo(
-        address consigneeAddress,
-        address userAddress,
-        uint256 tokenAmount
+    function adminCreateOfflinePurchase(
+        address _consigneeAddress,
+        address _userAddress,
+        uint96 _tokenAmount
     ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
-        _addPurchaseInfo(consigneeAddress, userAddress, tokenAmount);
+        _createOfflinePurchase(_consigneeAddress, _userAddress, _tokenAmount);
     }
 
-    function _addPurchaseInfo(
-        address consigneeAddress,
-        address userAddress,
-        uint256 tokenAmount
+    function _createOfflinePurchase(
+        address _consigneeAddress,
+        address _userAddress,
+        uint96 _tokenAmount
     ) internal {
-        require(userAddress != address(0), "Invalid user address");
-        require(tokenAmount > 0, "Invalid token amount");
-        ConsigneeInfo storage consigneeInfo = _consigneeInfos[consigneeAddress];
+        require(_userAddress != address(0), "Invalid user address");
+        require(_tokenAmount > 0, "Invalid token amount");
+        ConsigneeInfo storage consigneeInfo = _consigneeInfos[
+            _consigneeAddress
+        ];
         uint256 tokenAmountLeft = consigneeInfo.totalTokenAmount -
             consigneeInfo.soldTokenAmount;
-        require(tokenAmount <= tokenAmountLeft, "Exceeded total token amount");
-        consigneeInfo.soldTokenAmount += tokenAmount;
+        require(_tokenAmount <= tokenAmountLeft, "Exceeded total token amount");
+        consigneeInfo.soldTokenAmount += _tokenAmount;
 
-        _purchaseInfos[userAddress].push(
+        _purchaseInfos[_userAddress].push(
             PurchaseInfo({
-                consigneeAddress: consigneeAddress,
-                tokenAmount: tokenAmount
+                consigneeAddress: _consigneeAddress,
+                tokenAmount: _tokenAmount,
+                createTime: block.timestamp
             })
         );
 
-        _purchasersByConsignee[consigneeAddress].push(userAddress);
+        _purchasersByConsignee[_consigneeAddress].push(_userAddress);
+
+        // 与 verstingController 交互
+        vestingWallet.addSchedule(_userAddress, _tokenAmount);
 
         emit AddPurchaseInfo(
             msg.sender,
-            consigneeAddress,
-            userAddress,
-            tokenAmount
+            _consigneeAddress,
+            _userAddress,
+            _tokenAmount
         );
     }
 
     /**
      * @dev 批量添加用户购买信息，仅注册的承销商可调用。
-     * @param userAddresses 用户地址数组。
-     * @param tokenAmounts 购买数量数组。
+     * @param _userAddresses 用户地址数组。
+     * @param _tokenAmounts 购买数量数组。
      */
-    function batchAddPurchaseInfo(
-        address[] calldata userAddresses,
-        uint256[] calldata tokenAmounts
+    function batchConsigneeCreateOfflinePurchase(
+        address[] calldata _userAddresses,
+        uint96[] calldata _tokenAmounts
     ) external onlyConsignee(msg.sender) whenNotPaused {
-        _batchAddPurchaseInfo(msg.sender, userAddresses, tokenAmounts);
+        _batchCreateOfflinePurchase(msg.sender, _userAddresses, _tokenAmounts);
     }
 
     /**
      * @dev 批量添加用户购买信息，仅项目方可调用。
-     * @param consigneeAddress 承销商地址。
-     * @param userAddresses 用户地址数组。
-     * @param tokenAmounts 购买数量数组。
+     * @param _consigneeAddress 承销商地址。
+     * @param _userAddresses 用户地址数组。
+     * @param _tokenAmounts 购买数量数组。
      */
-    function ownerBatchAddPurchaseInfo(
-        address consigneeAddress,
-        address[] calldata userAddresses,
-        uint256[] calldata tokenAmounts
+    function batchAdminCreateOfflinePurchase(
+        address _consigneeAddress,
+        address[] calldata _userAddresses,
+        uint96[] calldata _tokenAmounts
     ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
-        _batchAddPurchaseInfo(consigneeAddress, userAddresses, tokenAmounts);
+        _batchCreateOfflinePurchase(
+            _consigneeAddress,
+            _userAddresses,
+            _tokenAmounts
+        );
     }
 
-    function _batchAddPurchaseInfo(
-        address consigneeAddress,
-        address[] calldata userAddresses,
-        uint256[] calldata tokenAmounts
+    function _batchCreateOfflinePurchase(
+        address _consigneeAddress,
+        address[] calldata _beneficiaries,
+        uint96[] calldata _tokenAmounts
     ) internal {
         require(
-            userAddresses.length == tokenAmounts.length,
+            _beneficiaries.length == _tokenAmounts.length,
             "Mismatched array lengths"
         );
 
         uint256 totalTokenAmount;
-        for (uint256 i = 0; i < userAddresses.length; i++) {
-            address userAddress = userAddresses[i];
-            uint256 tokenAmount = tokenAmounts[i];
+        for (uint256 i = 0; i < _tokenAmounts.length; i++) {
+            address userAddress = _beneficiaries[i];
+            uint256 tokenAmount = _tokenAmounts[i];
 
             require(userAddress != address(0), "Invalid user address");
             require(tokenAmount > 0, "Invalid token amount");
@@ -256,22 +270,25 @@ contract Sale is
 
             _purchaseInfos[userAddress].push(
                 PurchaseInfo({
-                    consigneeAddress: consigneeAddress,
-                    tokenAmount: tokenAmount
+                    consigneeAddress: _consigneeAddress,
+                    tokenAmount: tokenAmount,
+                    createTime: block.timestamp
                 })
             );
 
-            _purchasersByConsignee[consigneeAddress].push(userAddress);
+            _purchasersByConsignee[_consigneeAddress].push(userAddress);
 
             emit AddPurchaseInfo(
                 msg.sender,
-                consigneeAddress,
+                _consigneeAddress,
                 userAddress,
                 tokenAmount
             );
         }
 
-        ConsigneeInfo storage consigneeInfo = _consigneeInfos[consigneeAddress];
+        ConsigneeInfo storage consigneeInfo = _consigneeInfos[
+            _consigneeAddress
+        ];
         uint256 tokenAmountLeft = consigneeInfo.totalTokenAmount -
             consigneeInfo.soldTokenAmount;
         require(
@@ -279,6 +296,9 @@ contract Sale is
             "Exceeded total token amount"
         );
         consigneeInfo.soldTokenAmount += totalTokenAmount;
+
+        // 与 vestingWallet 交互
+        vestingWallet.battchAddSchedule(_beneficiaries, _tokenAmounts);
     }
 
     /**
@@ -375,6 +395,14 @@ contract Sale is
     ) external view returns (bool) {
         ConsigneeInfo storage info = _consigneeInfos[consigneeAddress];
         return info.totalTokenAmount > 0;
+    }
+
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
     function _authorizeUpgrade(

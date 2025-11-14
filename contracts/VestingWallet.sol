@@ -121,6 +121,14 @@ contract VestingWallet is
         _disableInitializers();
     }
 
+    /**
+     * @dev 初始化参数
+     * @param _defaultAdmin admin 管理员
+     * @param _pauser 暂停员
+     * @param _upgrader 更新员
+     * @param _manager 添加归属管理员
+     * @param _tokenAddress 释放代币地址
+     */
     function initialize(
         address _defaultAdmin,
         address _pauser,
@@ -139,7 +147,14 @@ contract VestingWallet is
         tokenAddress = IERC20(_tokenAddress);
     }
 
-    // 管理员更新 VestingInfo
+    /**
+     * @dev 管理员更新 VestingInfo
+     * @param _cliffTime 悬崖期时间，秒
+     * @param _startTimestamp 开始时间戳
+     * @param _durationTime 持续时间
+     * @param _tgeTimestamp tge 时间戳
+     * @param _tgePercentage tge 释放百分比
+     */
     function updateVestingInfo(
         uint64 _cliffTime,
         uint64 _startTimestamp,
@@ -156,7 +171,12 @@ contract VestingWallet is
         });
     }
 
-    // 管理员添加归属计划
+    /**
+     * @dev 管理员添加归属计划
+     * @param _beneficiary 受益人地址
+     * @param _tokenAmount 代币数量
+     * return scheduleId 返回当前的 scheduleId
+     */
     function addSchedule(
         address _beneficiary,
         uint96 _tokenAmount
@@ -169,7 +189,11 @@ contract VestingWallet is
         return _addSchedule(_beneficiary, _tokenAmount);
     }
 
-    // 管理员批量添加归属计划
+    /**
+     * @dev 管理员批量添加归属计划
+     * @param _beneficiaries 受益人地址数组
+     * @param _tokenAmounts 代币数量数组
+     */
     function battchAddSchedule(
         address[] calldata _beneficiaries,
         uint96[] calldata _tokenAmounts
@@ -222,14 +246,22 @@ contract VestingWallet is
         emit AddSchedule(scheduleId, _beneficiary, _tokenAmount);
     }
 
-    // 用户领取tge的代币数量
+    /**
+     * @dev 用户领取tge的代币数量
+     * @param _scheduleId _scheduleId
+     * @return tgeAmount tgeAmount 数量
+     */
     function claimTgeAmount(
         uint256 _scheduleId
     ) external whenNotPaused returns (uint96 tgeAmount) {
         return _claimTgeAmount(_scheduleId, msg.sender);
     }
 
-    // 用户批量领取tge的代币数量
+    /**
+     * @dev 用户批量领取tge的代币数量
+     * @param _scheduleIds _scheduleId 数组
+     * @return tgeAllAmount tgeAllAmount 总数量
+     */
     function batchClaimTgeAmount(
         uint256[] calldata _scheduleIds
     ) external whenNotPaused returns (uint96 tgeAllAmount) {
@@ -258,7 +290,10 @@ contract VestingWallet is
         tokenAddress.safeTransfer(msg.sender, tgeAllAmount);
     }
 
-    // 管理员批量领取tge的代币数量
+    /**
+     * @dev 管理员批量领取tge的代币数量
+     * @param _scheduleIds _scheduleId 数组
+     */
     function adminBatchClaimTgeAmount(
         uint256[] calldata _scheduleIds
     ) external onlyRole(VEST_MANAGER_ROLE) whenNotPaused {
@@ -293,14 +328,22 @@ contract VestingWallet is
         emit ClaimTgeAmount(_scheduleId, _beneficiary, tgeAmount);
     }
 
-    // 用户领取释放的代币数量
+    /**
+     * @dev 用户领取释放的代币数量
+     * @param _scheduleId _scheduleId
+     * @return claimableAmount 可领取的总数量
+     */
     function claim(
         uint256 _scheduleId
     ) public whenNotPaused returns (uint96 claimableAmount) {
         return _claim(_scheduleId, msg.sender);
     }
 
-    // 用户批量领取代币数量
+    /**
+     * @dev 用户批量领取代币数量
+     * @param _scheduleIds _scheduleId 数组
+     * @return claimableAmount 可领取的总数量
+     */
     function batchClaim(
         uint256[] calldata _scheduleIds
     ) external whenNotPaused returns (uint96 claimableAmount) {
@@ -334,7 +377,10 @@ contract VestingWallet is
         tokenAddress.safeTransfer(msg.sender, claimableAmount);
     }
 
-    // 管理员批量领取代币数量
+    /**
+     * @dev 管理员批量领取代币数量
+     * @param _scheduleIds _scheduleId 数组
+     */
     function adminBatchClaim(
         uint256[] calldata _scheduleIds
     ) external onlyRole(VEST_MANAGER_ROLE) whenNotPaused {
@@ -375,14 +421,22 @@ contract VestingWallet is
         _unpause();
     }
 
-    // 获取用户对应的所有 scheduleIds
+    /**
+     * @dev 获取用户对应的所有 scheduleIds
+     * @param _beneficiary 受益人地址
+     * @return 用户对应的所有 scheduleIds
+     */
     function getScheduleIdsOfBeneficiary(
         address _beneficiary
     ) external view returns (uint256[] memory) {
         return _scheduleIdsOfBeneficiary[_beneficiary];
     }
 
-    // 根据 scheduleId 获取 ScheduleInfo
+    /**
+     * @dev 根据 scheduleId 获取 ScheduleInfo
+     * @param _scheduleId scheduleId
+     * @return scheduleInfo 获取 ScheduleInfo
+     */
     function getScheduleInfoById(
         uint256 _scheduleId
     ) external view returns (ScheduleInfo memory scheduleInfo) {
@@ -419,7 +473,11 @@ contract VestingWallet is
         });
     }
 
-    // 根据 scheduleId 获取当前可以释放的代币数量
+    /**
+     * @dev 根据 scheduleId 获取当前可以释放的代币数量
+     * @param _scheduleId scheduleId
+     * @return claimableAmount 可以释放的代币数量
+     */
     function getClaimableAmountByScheduleId(
         uint256 _scheduleId
     ) public view returns (uint96 claimableAmount) {
@@ -428,7 +486,12 @@ contract VestingWallet is
             _schedules[_scheduleId].releasedAmount;
     }
 
-    // 根据 scheduleId 获取当前总释放的代币数量
+    /**
+     * @dev 根据 scheduleId 获取当前总释放的代币数量
+     * @param _scheduleId scheduleId
+     * @param _currentTimestamp 给定的时间戳
+     * @return 可以释放的总代币数量
+     */
     function getAllVestedAmount(
         uint256 _scheduleId,
         uint64 _currentTimestamp
@@ -447,6 +510,10 @@ contract VestingWallet is
             _vestingInfo.durationTime;
     }
 
+    /**
+     * @dev 获取全局数据
+     * @return 获取全局数据
+     */
     function getVestingInfo() external view returns (VestingInfo memory) {
         return _vestingInfo;
     }
